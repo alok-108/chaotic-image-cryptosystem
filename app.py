@@ -7,17 +7,25 @@ and Split_Join Algorithm' by Durgabati Podder and Subhrajyoti Deb (2023).
 
 import os
 import sys
+from typing import Optional
 import numpy as np
-import streamlit as st
+import cv2
+
+# Set headless backend before importing pyplot
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import streamlit as st
 from PIL import Image
 
-# Add current directory to path so src can be imported cleanly
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Ensure project root is in sys.path
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
 
 from src.encrypt import encrypt
 from src.decrypt import decrypt
-from src.utils import load_image, image_to_bytes, pad_to_divisible_by_8
+from src.utils import load_image, image_to_bytes
 from src.metrics import (
     entropy,
     histogram,
@@ -28,30 +36,29 @@ from src.metrics import (
     encryption_time,
 )
 
-# Page configuration
+# Step 3.1: Page configuration at the top
 st.set_page_config(
     page_title="Chaotic Image Cryptosystem",
-    page_icon="🔒",
+    page_icon="🔐",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# Custom Styling
+# Custom Styling (Dark Theme & Glassmorphism)
 st.markdown(
     """
     <style>
-    /* Theme enhancements */
     .stApp {
-        background-color: #0f111a;
-        color: #e2e8f0;
+        background-color: #0E1117;
+        color: #FAFAFA;
     }
     .metric-card {
-        background: linear-gradient(135deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.8));
+        background: linear-gradient(135deg, rgba(30, 37, 48, 0.7), rgba(15, 20, 28, 0.8));
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 12px;
         padding: 16px;
         margin-bottom: 12px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
     }
     .metric-title {
         font-size: 0.85rem;
@@ -62,7 +69,7 @@ st.markdown(
     .metric-value {
         font-size: 1.6rem;
         font-weight: 700;
-        color: #38bdf8;
+        color: #4A90E2;
     }
     .metric-sub {
         font-size: 0.8rem;
@@ -80,17 +87,36 @@ st.markdown(
         color: #4ade80;
         border: 1px solid rgba(34, 197, 94, 0.4);
     }
-    .badge-info {
-        background-color: rgba(56, 189, 248, 0.2);
-        color: #38bdf8;
-        border: 1px solid rgba(56, 189, 248, 0.4);
-    }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-SAMPLE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "sample_images")
+SAMPLE_DIR = os.path.join(BASE_DIR, "data", "sample_images")
+
+
+def get_or_create_sample_image(name: str, as_gray: bool = False) -> np.ndarray:
+    """Load sample image with fallback generation to prevent deployment crashes."""
+    path = os.path.join(SAMPLE_DIR, f"{name}.png")
+    if os.path.exists(path):
+        try:
+            return load_image(path, as_gray=as_gray)
+        except Exception:
+            pass
+
+    # Dynamic fallback generator if file is missing
+    x = np.linspace(0, 4 * np.pi, 256)
+    y = np.linspace(0, 4 * np.pi, 256)
+    xx, yy = np.meshgrid(x, y)
+    if as_gray:
+        return ((np.sin(xx) * np.cos(yy) + 1.0) * 127.5).astype(np.uint8)
+    else:
+        synth = np.zeros((256, 256, 3), dtype=np.uint8)
+        synth[:, :, 0] = ((np.sin(xx) + 1.0) * 127.5).astype(np.uint8)
+        synth[:, :, 1] = ((np.cos(yy) + 1.0) * 127.5).astype(np.uint8)
+        synth[:, :, 2] = ((np.sin(xx + yy) + 1.0) * 127.5).astype(np.uint8)
+        return synth
+
 
 # Session State Initialization
 if "original_image" not in st.session_state:
@@ -144,20 +170,27 @@ with st.sidebar:
     color_mode = st.radio("Color Processing:", ["Color (RGB)", "Grayscale"], index=0)
     as_gray = color_mode == "Grayscale"
 
-    image_loaded = None
+    image_loaded: Optional[np.ndarray] = None
     if source_choice == "Standard Benchmark Images":
-        available_samples = []
-        if os.path.exists(SAMPLE_DIR):
-            available_samples = [f for f in os.listdir(SAMPLE_DIR) if f.endswith((".png", ".jpg", ".tif"))]
-
-        sample_name = st.selectbox("Select Benchmark Image:", available_samples if available_samples else ["None"])
-        if sample_name and sample_name != "None":
-            sample_path = os.path.join(SAMPLE_DIR, sample_name)
-            image_loaded = load_image(sample_path, as_gray=as_gray)
+        sample_name = st.selectbox("Select Benchmark Image:", ["lena", "baboon", "barbara"])
+        if sample_name:
+            image_loaded = get_or_create_sample_image(sample_name, as_gray=as_gray)
     else:
         uploaded_file = st.file_uploader("Upload Image (PNG, JPG, BMP):", type=["png", "jpg", "jpeg", "bmp"])
         if uploaded_file is not None:
-            image_loaded = load_image(uploaded_file.read(), as_gray=as_gray)
+            try:
+                raw_bytes = uploaded_file.read()
+                image_loaded = load_image(raw_bytes, as_gray=as_gray)
+                # Cloud memory protection: constrain large user images to max 512x512
+                H, W = image_loaded.shape[:2]
+                if max(H, W) > 512:
+                    scale = 512.0 / max(H, W)
+                    new_W = int(W * scale)
+                    new_H = int(H * scale)
+                    image_loaded = cv2.resize(image_loaded, (new_W, new_H), interpolation=cv2.INTER_AREA)
+                    st.info(f"Image automatically resized from ({H}, {W}) to ({new_H}, {new_W}) for cloud performance.")
+            except Exception as e:
+                st.error(f"Failed to process uploaded image: {e}")
 
     if image_loaded is not None:
         if st.session_state.original_image is None or not np.array_equal(st.session_state.original_image, image_loaded):
@@ -169,17 +202,19 @@ with st.sidebar:
             st.session_state.metrics_data = {}
 
     st.divider()
-    st.info(
-        "**Paper Reference:**\n"
-        "'A Fast and Secure Image Cryptosystem Based on New Row_Column Index Manipulator "
-        "and Split_Join Algorithm' (Podder & Deb, 2023)."
+    st.markdown(
+        """
+        **Paper Citation:**  
+        *Durgabati Podder & Subhrajyoti Deb (2023)*  
+        "A Fast and Secure Image Cryptosystem Based on New Row_Column Index Manipulator and Split_Join Algorithm"
+        """
     )
 
 # ----------------- MAIN VIEW -----------------
 st.title("Chaotic Image Cryptosystem")
 st.markdown(
     "A production-grade implementation of the dual-confusion and logistic map diffusion "
-    "image cryptosystem with complete security analytics."
+    "image cryptosystem with real-time security analytics."
 )
 
 tab1, tab2, tab3, tab4 = st.tabs([
@@ -201,64 +236,75 @@ with tab1:
         security_btn = st.button("🛡️ Run Security Analysis", use_container_width=True)
 
     # Handle Encryption
-    if encrypt_btn and st.session_state.original_image is not None:
-        with st.spinner("Executing Row-Column Manipulator, Split-Join, and Logistic Map XOR Diffusion..."):
-            t_enc, (cipher, stages) = encryption_time(
-                encrypt,
-                st.session_state.original_image,
-                x0=x0,
-                r=r,
-                auto_pad=True,
-                return_stages=True,
-            )
-            st.session_state.cipher_image = cipher
-            st.session_state.stages = stages
-            st.session_state.enc_time = t_enc
+    if encrypt_btn:
+        if st.session_state.original_image is None:
+            st.warning("Please upload or select an image first.")
+        else:
+            try:
+                with st.spinner("Executing Row-Column Manipulator, Split-Join, and Logistic Map XOR Diffusion..."):
+                    t_enc, (cipher, stages) = encryption_time(
+                        encrypt,
+                        st.session_state.original_image,
+                        x0=x0,
+                        r=r,
+                        auto_pad=True,
+                        return_stages=True,
+                    )
+                    st.session_state.cipher_image = cipher
+                    st.session_state.stages = stages
+                    st.session_state.enc_time = t_enc
 
-            # Compute preliminary metrics for cipher
-            st.session_state.metrics_data["cipher_entropy"] = entropy(cipher)
-            st.session_state.metrics_data["plain_entropy"] = entropy(st.session_state.original_image)
-            st.session_state.metrics_data["cipher_corr_h"] = correlation_coefficient(cipher, "horizontal")
-            st.session_state.metrics_data["cipher_corr_v"] = correlation_coefficient(cipher, "vertical")
-            st.session_state.metrics_data["cipher_corr_d"] = correlation_coefficient(cipher, "diagonal")
-            st.session_state.metrics_data["plain_corr_h"] = correlation_coefficient(st.session_state.original_image, "horizontal")
-            st.session_state.metrics_data["plain_corr_v"] = correlation_coefficient(st.session_state.original_image, "vertical")
-            st.session_state.metrics_data["plain_corr_d"] = correlation_coefficient(st.session_state.original_image, "diagonal")
+                    # Compute preliminary metrics for cipher
+                    st.session_state.metrics_data["cipher_entropy"] = entropy(cipher)
+                    st.session_state.metrics_data["plain_entropy"] = entropy(st.session_state.original_image)
+                    st.session_state.metrics_data["cipher_corr_h"] = correlation_coefficient(cipher, "horizontal")
+                    st.session_state.metrics_data["cipher_corr_v"] = correlation_coefficient(cipher, "vertical")
+                    st.session_state.metrics_data["cipher_corr_d"] = correlation_coefficient(cipher, "diagonal")
+                    st.session_state.metrics_data["plain_corr_h"] = correlation_coefficient(st.session_state.original_image, "horizontal")
+                    st.session_state.metrics_data["plain_corr_v"] = correlation_coefficient(st.session_state.original_image, "vertical")
+                    st.session_state.metrics_data["plain_corr_d"] = correlation_coefficient(st.session_state.original_image, "diagonal")
+            except Exception as e:
+                st.error(f"Encryption failed: {e}")
 
     # Handle Decryption
     if decrypt_btn:
         if st.session_state.cipher_image is None:
             st.warning("Please encrypt an image first.")
         else:
-            with st.spinner("Inverting XOR diffusion, Split-Join permutations, and Row-Column scrambling..."):
-                t_dec, decrypted = encryption_time(
-                    decrypt,
-                    st.session_state.cipher_image,
-                    x0=x0,
-                    r=r,
-                    orig_shape=st.session_state.orig_shape,
-                )
-                st.session_state.decrypted_image = decrypted
-                st.session_state.dec_time = t_dec
+            try:
+                with st.spinner("Inverting XOR diffusion, Split-Join permutations, and Row-Column scrambling..."):
+                    t_dec, decrypted = encryption_time(
+                        decrypt,
+                        st.session_state.cipher_image,
+                        x0=x0,
+                        r=r,
+                        orig_shape=st.session_state.orig_shape,
+                    )
+                    st.session_state.decrypted_image = decrypted
+                    st.session_state.dec_time = t_dec
+            except Exception as e:
+                st.error(f"Decryption failed: {e}")
 
     # Handle Full Security Analysis
     if security_btn:
         if st.session_state.original_image is None or st.session_state.cipher_image is None:
             st.warning("Please encrypt an image first before running security analysis.")
         else:
-            with st.spinner("Computing differential sensitivity (NPCR & UACI), key space, and correlation..."):
-                # Key sensitivity test: encrypt with key perturbed by 10^-15
-                cipher1 = st.session_state.cipher_image
-                cipher2 = encrypt(st.session_state.original_image, x0=x0 + 1e-15, r=r, auto_pad=True)
+            try:
+                with st.spinner("Computing differential sensitivity (NPCR & UACI), key space, and correlation..."):
+                    cipher1 = st.session_state.cipher_image
+                    cipher2 = encrypt(st.session_state.original_image, x0=x0 + 1e-15, r=r, auto_pad=True)
 
-                npcr_val = npcr(cipher1, cipher2)
-                uaci_val = uaci(cipher1, cipher2)
-                ks_val = key_space(x0=x0, r=r)
+                    npcr_val = npcr(cipher1, cipher2)
+                    uaci_val = uaci(cipher1, cipher2)
+                    ks_val = key_space(x0=x0, r=r)
 
-                st.session_state.metrics_data["npcr"] = npcr_val
-                st.session_state.metrics_data["uaci"] = uaci_val
-                st.session_state.metrics_data["key_space"] = ks_val
-                st.success("Security analysis successfully completed!")
+                    st.session_state.metrics_data["npcr"] = npcr_val
+                    st.session_state.metrics_data["uaci"] = uaci_val
+                    st.session_state.metrics_data["key_space"] = ks_val
+                    st.success("Security analysis successfully completed!")
+            except Exception as e:
+                st.error(f"Security analysis failed: {e}")
 
     st.write("")
 
@@ -287,7 +333,7 @@ with tab1:
                     delta=f"{st.session_state.metrics_data['cipher_entropy'] - st.session_state.metrics_data['plain_entropy']:.4f} bits",
                 )
 
-            # Download cipher button
+            # In-memory download for Streamlit Cloud
             cipher_bytes = image_to_bytes(st.session_state.cipher_image)
             st.download_button(
                 label="📥 Download Cipher Image",
@@ -306,14 +352,12 @@ with tab1:
             if st.session_state.dec_time is not None:
                 st.metric("Decryption Time", f"{st.session_state.dec_time * 1000:.1f} ms")
 
-            # Verification check
             is_match = np.array_equal(st.session_state.original_image, st.session_state.decrypted_image)
             if is_match:
                 st.markdown('<span class="status-badge badge-success">✓ 100% Lossless Match (Exact)</span>', unsafe_allow_html=True)
             else:
                 st.error("Decryption mismatch detected.")
 
-            # Download decrypted button
             dec_bytes = image_to_bytes(st.session_state.decrypted_image)
             st.download_button(
                 label="📥 Download Decrypted Image",
@@ -452,13 +496,16 @@ with tab3:
         st.markdown("**Key Sensitivity Demonstration:**")
         st.markdown(
             "Due to sensitive dependence on initial conditions (Lyapunov exponent $\\lambda > 0$), "
-            "decrypting with a key perturbed by as little as $10^{-15}$ produces pure white noise."
+            "decrypting with a key perturbed by as little as $10^{-15}$ produces pure noise."
         )
         if st.button("🧪 Test Decryption with Perturbed Key (x0 + 10⁻¹⁵)"):
             if st.session_state.cipher_image is not None:
-                wrong_x0 = x0 + 1e-15
-                wrong_decrypted = decrypt(st.session_state.cipher_image, x0=wrong_x0, r=r, orig_shape=st.session_state.orig_shape)
-                st.image(wrong_decrypted, caption="Result of Decrypting with x0 + 1e-15 (Complete Failure to Recover)", use_container_width=True)
+                try:
+                    wrong_x0 = x0 + 1e-15
+                    wrong_decrypted = decrypt(st.session_state.cipher_image, x0=wrong_x0, r=r, orig_shape=st.session_state.orig_shape)
+                    st.image(wrong_decrypted, caption="Result of Decrypting with x0 + 1e-15 (Complete Failure to Recover)", use_container_width=True)
+                except Exception as e:
+                    st.error(f"Perturbation test failed: {e}")
             else:
                 st.warning("Please encrypt an image first.")
 
@@ -512,18 +559,3 @@ with tab4:
             "✓ Highly Optimized Vectorized NumPy",
         ],
     })
-
-    st.divider()
-    st.markdown(
-        """
-        ### 🔍 Architectural Highlights:
-        - **Double Confusion Layer**:
-            1. **Row & Column Index Manipulator**: Permutes horizontal and vertical pixel tracks independently.
-            2. **Split & Join Algorithm**: Deconstructs the image into an 8x8 matrix of 64 sub-blocks, applies 180° and 90° spatial rotations, distributes blocks into 8 chaotic vectors, and reassembles them horizontally and vertically.
-        - **Diffusion Layer**:
-            - Dynamic pseudo-random byte stream via chaotic 1D Logistic Map ($r \\approx 3.9999$).
-            - Bitwise XOR diffusion across all color channels.
-        - **Invertibility**:
-            - Every operation is a mathematical bijection, ensuring 100% exact, bit-for-bit lossless recovery.
-        """
-    )

@@ -13,6 +13,8 @@ Provides functions to compute:
 import time
 from typing import Any, Callable, Dict, Optional, Tuple, Union
 import numpy as np
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 

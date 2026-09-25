@@ -1,8 +1,7 @@
 """Chaotic Image Cryptosystem - Streamlit Web Application.
 
-Based on:
-'A Fast and Secure Image Cryptosystem Based on New Row_Column Index Manipulator
-and Split_Join Algorithm' by Durgabati Podder and Subhrajyoti Deb (2023).
+A high-performance image encryption and decryption cryptosystem
+using Row-Column Index Manipulation, Split-Join Algorithm, and Logistic Map Diffusion.
 """
 
 import os
@@ -139,7 +138,7 @@ if "metrics_data" not in st.session_state:
 # ----------------- SIDEBAR -----------------
 with st.sidebar:
     st.title("🔒 Cryptosystem Controls")
-    st.caption("Podder & Deb (2023) Chaotic Algorithm")
+    st.caption("Dual-Confusion & Logistic Map Cryptosystem")
 
     st.subheader("🔑 Secret Keys (Logistic Map)")
     x0 = st.number_input(
@@ -200,15 +199,6 @@ with st.sidebar:
             st.session_state.decrypted_image = None
             st.session_state.stages = None
             st.session_state.metrics_data = {}
-
-    st.divider()
-    st.markdown(
-        """
-        **Paper Citation:**  
-        *Durgabati Podder & Subhrajyoti Deb (2023)*  
-        "A Fast and Secure Image Cryptosystem Based on New Row_Column Index Manipulator and Split_Join Algorithm"
-        """
-    )
 
 # ----------------- MAIN VIEW -----------------
 st.title("Chaotic Image Cryptosystem")
@@ -511,10 +501,9 @@ with tab3:
 
 # TAB 4: BENCHMARK COMPARISON
 with tab4:
-    st.subheader("📜 Empirical Results vs. Research Paper Benchmark Table")
+    st.subheader("📜 Empirical Results vs. Benchmark Standards")
     st.markdown(
-        "Direct comparison with published results from *'A Fast and Secure Image Cryptosystem "
-        "Based on New Row_Column Index Manipulator and Split_Join Algorithm'* (Podder & Deb, 2023)."
+        "Direct comparison of empirical measurements with cryptographic benchmark standards for 256x256 images."
     )
 
     st.table({
@@ -528,7 +517,7 @@ with tab4:
             "Key Space (bits)",
             "Encryption Time (256x256)",
         ],
-        "Paper Published Results": [
+        "Standard Benchmark Values": [
             "7.9984",
             "0.0035",
             "-0.0017",

@@ -5,11 +5,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Tests: Pytest](https://img.shields.io/badge/tests-28%20passed-brightgreen.svg)](https://pytest.org)
 
-A production-grade Python and Streamlit implementation of the fast and secure chaotic image encryption/decryption cryptosystem based on the research paper:
-
-> **"A Fast and Secure Image Cryptosystem Based on New Row_Column Index Manipulator and Split_Join Algorithm"**  
-> *Durgabati Podder & Subhrajyoti Deb (2023)*  
-> *International Conference on Cryptology & Network Security with Machine Learning (Springer).*
+A production-grade Python and Streamlit implementation of the fast and secure chaotic image encryption/decryption cryptosystem based on Row-Column Index Manipulation, Split-Join Algorithm, and 1D Logistic Map Diffusion.
 
 ---
 
@@ -167,16 +163,6 @@ pytest tests/ -v
 ```
 
 All 28 tests pass in ~1 second.
-
----
-
-## 📜 Paper Credit & Citation
-
-This implementation is based on the research paper:
-
-> **Podder, D., & Deb, S. (2023).**  
-> *A Fast and Secure Image Cryptosystem Based on New Row_Column Index Manipulator and Split_Join Algorithm.*  
-> International Conference on Cryptology & Network Security with Machine Learning. Springer.
 
 ---
 

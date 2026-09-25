@@ -1,8 +1,7 @@
 """Chaotic Image Cryptosystem package.
 
-Based on:
-'A Fast and Secure Image Cryptosystem Based on New Row_Column Index Manipulator
-and Split_Join Algorithm' by Durgabati Podder and Subhrajyoti Deb (2023).
+A high-performance image encryption and decryption cryptosystem
+using Row-Column Index Manipulation, Split-Join Algorithm, and Logistic Map Diffusion.
 """
 
 from .logistic_map import (

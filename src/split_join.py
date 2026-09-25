@@ -1,9 +1,5 @@
 """Split and Join Algorithm (Second Confusion Stage).
 
-Based on Section 4 of the paper:
-'A Fast and Secure Image Cryptosystem Based on New Row_Column Index Manipulator
-and Split_Join Algorithm' by Durgabati Podder and Subhrajyoti Deb (2023).
-
 Algorithm steps:
 1. Divide image into 64 equal parts (8x8 grid). For 256x256, each part is 32x32.
 2. Label parts 0 to 63 in row-major order.

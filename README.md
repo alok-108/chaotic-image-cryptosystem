@@ -70,7 +70,7 @@ chaotic_image_cryptosystem/
 Ensure Python 3.10+ is installed:
 
 ```bash
-git clone https://github.com/kdutt0974-source/chaotic-image-cryptosystem.git
+git clone https://github.com/alok-108/chaotic-image-cryptosystem.git
 cd chaotic-image-cryptosystem
 pip install -r requirements.txt
 ```
@@ -97,7 +97,7 @@ This repository is pre-configured for free one-click deployment on **Streamlit C
 2. Visit **[share.streamlit.io](https://share.streamlit.io)** and log in with your GitHub account.
 3. Click **"New app"** (or "Create app").
 4. Fill in the deployment form:
-   - **Repository:** `kdutt0974-source/chaotic-image-cryptosystem`
+   - **Repository:** `alok-108/chaotic-image-cryptosystem`
    - **Branch:** `main`
    - **Main file path:** `app.py`
 5. Click **"Deploy!"**.
